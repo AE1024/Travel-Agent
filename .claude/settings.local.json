@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:duffel.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(flutter --version)",
+      "Bash(flutter pub *)",
+      "Bash(flutter analyze *)",
+      "Bash(flutter devices *)",
+      "Bash(flutter run *)",
+      "Bash(adb -s emulator-5554 shell \"echo ready\")",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" devices)",
+      "Bash(ls \"C:/Users/elmaz/Desktop/A2M2_Ekibi_Oto_Pusula_Uygulamasi/\" 2>/dev/null)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(dotnet build *)",
+      "Bash(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\")",
+      "Bash(Write-Host \"Docker Desktop başlatılıyor...\")",
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":8080\")",
+      "Bash(findstr LISTENING)",
+      "Bash(tasklist /FI \"PID eq 6136\" /FO LIST)",
+      "Bash(tasklist /FI \"PID eq 8960\" /FO LIST)",
+      "Bash(Start-Sleep -Seconds 5)",
+      "Bash(curl -s http://localhost:8081/health)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(Start-Sleep -Seconds 3)",
+      "Bash(curl -s -X POST http://localhost:8081/auth/login -H \"Content-Type: application/json\" -d '{\"identifier\":\"mehmet@gmail.com\",\"sifre\":\"Mehmet123\"}')",
+      "Bash(curl -s -X POST http://localhost:8081/auth/login -H \"Content-Type: application/json\" -d '{\"identifier\":\"mehmet2@gmail.com\",\"sifre\":\"Mehmet123\"}')",
+      "WebFetch(domain:serpapi.com)",
+      "PowerShell(New-Item -Force \"C:\\\\Users\\\\elmaz\\\\AIProject\\\\TravelAgent\\\\frontend\\\\src\\\\components\\\\FlightCards.jsx\")",
+      "PowerShell(New-Item -Force \"C:\\\\Users\\\\elmaz\\\\AIProject\\\\TravelAgent\\\\frontend\\\\src\\\\components\\\\HotelCards.jsx\")"
+    ]
+  }
+}
