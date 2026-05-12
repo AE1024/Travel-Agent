@@ -13,3 +13,6 @@ google_search_results==2.4.2
 requests==2.33.1
 httpx==0.28.1
 python-multipart==0.0.28
+langsmith==0.8.0
+deepeval>=2.0.0
+pytest>=8.0.0

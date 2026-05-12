@@ -4,6 +4,11 @@
 *.pyc
 agent_v/
 
+# DeepEval
+**/.deepeval/
+**/.deep_eval/
+**/.pytest_cache/
+
 # Frontend
 frontend/node_modules/
 frontend/dist/
