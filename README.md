@@ -1,8 +1,11 @@
-# Travel Agent — AI Destekli Seyahat Planlama Asistanı
+# Travel Agent — AI-Powered Travel Planning Assistant
 
-Uçuş, otel ve transfer aramalarını tek bir sohbet akışında birleştiren, LangGraph tabanlı çok adımlı bir AI agent uygulaması.
+LangGraph tabanlı çok adımlı AI agent uygulaması / LangGraph-based multi-step AI agent application
 
 ---
+
+<details>
+<summary>🇹🇷 Türkçe</summary>
 
 ## Proje Hakkında
 
@@ -57,7 +60,7 @@ Kullanıcı Mesajı
 
 | Katman | Teknoloji |
 |---|---|
-| Frontend | React 19, Vite 5 | 
+| Frontend | React 19, Vite 5 |
 | Backend | FastAPI, Uvicorn |
 | Agent Framework | LangGraph |
 | LLM | Cerebras Cloud (Qwen-3-235B) |
@@ -149,6 +152,7 @@ GROQ_API_KEY      = your_groq_key
 ```
 
 **API Key Alma:**
+
 | Servis | URL |
 |---|---|
 | SerpAPI | https://serpapi.com |
@@ -171,15 +175,6 @@ API dökümantasyonu: http://localhost:8000/docs
 ```bash
 cd frontend
 npm install
-```
-
-`frontend/.env.development` dosyası oluştur (zaten var):
-
-```env
-VITE_API_URL=http://localhost:8000
-```
-
-```bash
 npm run dev
 ```
 
@@ -214,12 +209,7 @@ Uygulama: http://localhost:5173
 
 ```bash
 cd backend
-
-# Tüm DeepEval testlerini çalıştır
 deepeval test run tests/test_example.py
-
-# Sadece belirli bir test
-deepeval test run tests/test_example.py::test_iata_istanbul_paris
 ```
 
 **Test Kapsamı:**
@@ -229,13 +219,9 @@ deepeval test run tests/test_example.py::test_iata_istanbul_paris
 - Konu dışı sorgu reddi
 - Geçmiş tarih reddi
 
-Sonuçlar terminalde ve Confident AI dashboard'unda görünür.
-
 ---
 
 ## Deploy — Railway
-
-Proje Railway'de iki ayrı servis olarak çalışır:
 
 | Servis | Root Dir | URL |
 |---|---|---|
@@ -249,13 +235,13 @@ CEREBRAS_API_KEY
 SERPAPI_KEY
 LANGCHAIN_TRACING_V2 = true
 LANGCHAIN_API_KEY
-LANGCHAIN_PROJECT = travel-agent
+LANGCHAIN_PROJECT    = travel-agent
 ```
 
 ### Frontend Variables (Railway)
 
 ```
-VITE_API_URL = https://travel-agent-production-149d.up.railway.app/
+VITE_API_URL = https://travel-agent-production-d4c2.up.railway.app
 ```
 
 ### Yeniden Deploy
@@ -264,14 +250,11 @@ VITE_API_URL = https://travel-agent-production-149d.up.railway.app/
 git add .
 git commit -m "feat: açıklama"
 git push origin main
-# Railway otomatik deploy eder
 ```
 
 ---
 
 ## Observability — LangSmith
-
-Backend çalışırken tüm agent çalıştırmaları otomatik olarak LangSmith'e gönderilir.
 
 - **Dashboard:** https://smith.langchain.com
 - **Proje:** `travel-agent`
@@ -285,3 +268,282 @@ Backend çalışırken tüm agent çalıştırmaları otomatik olarak LangSmith'
 - LLM olarak Cerebras üzerinde Qwen-3-235B kullanılır (OpenAI uyumlu API)
 - SerpAPI Google Flights, Google Hotels ve Google Maps verilerini çeker
 - CORS tüm origin'lere açıktır; production'da `ALLOWED_ORIGINS` env var ile kısıtlanabilir
+
+</details>
+
+---
+
+<details open>
+<summary>🇬🇧 English</summary>
+
+## About the Project
+
+Travel Agent is an application where users communicate travel requests in natural language and an AI agent manages the step-by-step flight → hotel → transfer process. User confirmation is collected at each stage; selections are automatically carried to the next phase.
+
+### Target Audience
+
+- Individual users who want to plan trips from a single interface
+- Travelers who want to compare flight + accommodation + transfer combinations
+- Developers looking to learn AI agent architectures
+
+---
+
+## Architecture
+
+```
+┌─────────────────────┐        ┌──────────────────────────────────────┐
+│   Frontend          │        │   Backend                            │
+│   React + Vite      │◄──────►│   FastAPI                            │
+│   Hosted on Railway │        │   └── LangGraph Agent                │
+└─────────────────────┘        │        ├── search_flights (SerpAPI)  │
+                                │        ├── search_hotels  (SerpAPI)  │
+                                │        └── search_transport(SerpAPI) │
+                                │   LLM: Cerebras (Qwen-3-235B)        │
+                                │   Tracing: LangSmith                 │
+                                │   Testing: DeepEval + Groq judge     │
+                                └──────────────────────────────────────┘
+```
+
+### Agent Flow
+
+```
+User Message
+      │
+      ▼
+  orchestrator  ──► tools (SerpAPI search)
+      │                    │
+      ▼                    ▼
+   approval  ◄──── list results
+  (user makes a selection)
+      │
+      ▼
+  phase: flight → hotel → transport → done
+      │
+      ▼
+  summary_node (travel summary)
+```
+
+---
+
+## Technology Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, Vite 5 |
+| Backend | FastAPI, Uvicorn |
+| Agent Framework | LangGraph |
+| LLM | Cerebras Cloud (Qwen-3-235B) |
+| Search | SerpAPI (Google Flights, Hotels, Maps) |
+| Observability | LangSmith |
+| Evaluation | DeepEval + Confident AI |
+| Deploy | Railway (backend + frontend as separate services) |
+
+---
+
+## Folder Structure
+
+```
+TravelAgent/
+├── backend/
+│   ├── main.py              # FastAPI app, endpoints
+│   ├── railway.toml         # Railway deploy configuration
+│   ├── requirements.txt     # Python dependencies
+│   ├── .env                 # API keys (not committed to git)
+│   ├── agent/
+│   │   ├── graph.py         # LangGraph agent definition
+│   │   ├── state.py         # Pydantic models (FlightOption, HotelOption...)
+│   │   └── tools/
+│   │       ├── flights.py   # Flight search tool
+│   │       ├── hotels.py    # Hotel search tool
+│   │       └── transport.py # Transfer search tool
+│   └── tests/
+│       └── test_example.py  # DeepEval test file
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx          # Main app, API integration
+│   │   └── components/      # TravelForm, FlightCards, HotelCards, SummaryCard
+│   ├── railway.toml         # Railway static site configuration
+│   └── package.json
+└── .gitignore
+```
+
+---
+
+## Setup — Local Development
+
+### Requirements
+
+- Python 3.11+
+- Node.js 20+
+- Git
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/AE1024/Travel-Agent.git
+cd Travel-Agent
+```
+
+### 2. Backend Setup
+
+```bash
+# Create virtual environment
+python -m venv agent_v
+
+# Activate (Windows)
+agent_v\Scripts\Activate.ps1
+
+# Activate (macOS/Linux)
+source agent_v/bin/activate
+
+# Install dependencies
+cd backend
+pip install -r requirements.txt
+```
+
+### 3. Environment Variables
+
+Create `backend/.env`:
+
+```env
+# Required
+SERPAPI_KEY      = your_serpapi_key
+CEREBRAS_API_KEY = your_cerebras_key
+
+# LangSmith (optional — for tracing)
+LANGCHAIN_TRACING_V2 = true
+LANGCHAIN_API_KEY    = your_langsmith_key
+LANGCHAIN_PROJECT    = travel-agent
+
+# DeepEval (optional — for testing)
+CONFIDENT_API_KEY = your_confident_ai_key
+GROQ_API_KEY      = your_groq_key
+```
+
+**Where to get API keys:**
+
+| Service | URL |
+|---|---|
+| SerpAPI | https://serpapi.com |
+| Cerebras | https://cloud.cerebras.ai |
+| LangSmith | https://smith.langchain.com |
+| Confident AI | https://app.confident-ai.com |
+| Groq | https://console.groq.com |
+
+### 4. Start the Backend
+
+```bash
+cd backend
+uvicorn main:app --reload --port 8000
+```
+
+API docs: http://localhost:8000/docs
+
+### 5. Frontend Setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+App: http://localhost:5173
+
+---
+
+## How to Use
+
+1. Open the app in your browser
+2. Fill in the travel form: origin, destination, date, number of passengers
+3. The AI agent lists flights → select a flight
+4. The agent asks how many nights → specify hotel preferences
+5. The agent lists hotels → select a hotel
+6. The agent lists transfer options → select or skip
+7. A travel summary with booking links is displayed
+
+---
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/health` | Service health check |
+| POST | `/chat` | Chat with the agent |
+| POST | `/search-flights` | Direct flight search |
+| POST | `/search-hotels` | Direct hotel search |
+
+---
+
+## Running Tests
+
+```bash
+cd backend
+deepeval test run tests/test_example.py
+
+# Run a specific test
+deepeval test run tests/test_example.py::test_iata_istanbul_paris
+```
+
+**Test Coverage:**
+- IATA code accuracy (IST, CDG, LHR, JFK...)
+- Phase transitions (flight → hotel → transfer)
+- Missing information handling
+- Off-topic query rejection
+- Past date rejection
+
+Results appear in the terminal and on the Confident AI dashboard.
+
+---
+
+## Deploy — Railway
+
+| Service | Root Dir | URL |
+|---|---|---|
+| Backend (FastAPI) | `backend/` | `travel-agent-production-d4c2.up.railway.app` |
+| Frontend (React) | `frontend/` | `delightful-vitality-production-149d.up.railway.app` |
+
+### Backend Variables (Railway)
+
+```
+CEREBRAS_API_KEY
+SERPAPI_KEY
+LANGCHAIN_TRACING_V2 = true
+LANGCHAIN_API_KEY
+LANGCHAIN_PROJECT    = travel-agent
+```
+
+### Frontend Variables (Railway)
+
+```
+VITE_API_URL = https://travel-agent-production-d4c2.up.railway.app
+```
+
+### Redeploy
+
+```bash
+git add .
+git commit -m "feat: description"
+git push origin main
+# Railway deploys automatically
+```
+
+---
+
+## Observability — LangSmith
+
+All agent runs are automatically sent to LangSmith while the backend is running.
+
+- **Dashboard:** https://smith.langchain.com
+- **Project:** `travel-agent`
+- Visible: tool calls, token counts, latency, debugging
+
+---
+
+## Development Notes
+
+- The agent uses `MemorySaver` — each `thread_id` is an independent conversation session
+- Uses Qwen-3-235B on Cerebras (OpenAI-compatible API)
+- SerpAPI fetches data from Google Flights, Google Hotels, and Google Maps
+- CORS is open to all origins; restrict in production using the `ALLOWED_ORIGINS` env var
+
+</details>
