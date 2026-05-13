@@ -250,6 +250,15 @@ def search_hotels(
             platform_links=platform_links,
         ))
 
+    if amenities and "free_breakfast" in amenities:
+        def _has_free_breakfast(h: HotelOption) -> bool:
+            for a in h.amenities:
+                a_lower = a.lower()
+                if "breakfast" in a_lower and "$" not in a and "(" not in a:
+                    return True
+            return False
+        all_hotels = [h for h in all_hotels if _has_free_breakfast(h)]
+
     if near_airport and airport_coords:
         all_hotels.sort(key=lambda h: h.airport_distance_km or 9999)
 
