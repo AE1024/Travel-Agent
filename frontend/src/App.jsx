@@ -233,6 +233,16 @@ export default function App() {
         )}
 
       </main>
+
+      <footer style={{
+        textAlign: 'center',
+        padding: '20px',
+        fontSize: 12,
+        color: 'var(--color-slate)',
+        borderTop: '1px solid var(--color-chalk)',
+      }}>
+        © {new Date().getFullYear()} Anıl Elmaz
+      </footer>
     </div>
   )
 }
