@@ -28,6 +28,7 @@ class HotelOption(BaseModel):
     latitude: float = 0.0
     longitude: float = 0.0
     amenities: list[str] = []
+    rating: float | None = None
     airport_distance_km: float | None = None
     airport_duration: str | None = None
     platform_links: dict[str, str] = {}

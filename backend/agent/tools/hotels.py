@@ -124,6 +124,7 @@ def search_hotels(
     hotel_name: str | None = None,
     amenities: list[str] | None = None,
     sort_by: str | None = None,
+    min_rating: float | None = None,
 ) -> str:
     """Search for available hotels across Booking.com and Airbnb.
     airport_iata: Destination airport IATA code (e.g. 'LHR'). Used to calculate distance.
@@ -235,11 +236,18 @@ def search_hotels(
             hotel_name_str, check_in_date, check_out_date, adults, prices_list
         )
 
+        overall_rating = h.get("overall_rating")
+        try:
+            overall_rating = float(overall_rating) if overall_rating else None
+        except (ValueError, TypeError):
+            overall_rating = None
+
         all_hotels.append(HotelOption(
             name=hotel_name_str,
             price_per_night=price,
             currency=currency,
             stars=stars,
+            rating=overall_rating,
             platform="Booking.com",
             booking_url=platform_links.get("Booking.com"),
             latitude=lat,
@@ -249,6 +257,9 @@ def search_hotels(
             airport_duration=airport_duration,
             platform_links=platform_links,
         ))
+
+    if min_rating:
+        all_hotels = [h for h in all_hotels if h.rating is not None and h.rating >= min_rating]
 
     if amenities and "free_breakfast" in amenities:
         def _has_free_breakfast(h: HotelOption) -> bool:

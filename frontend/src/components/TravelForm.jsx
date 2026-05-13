@@ -118,6 +118,7 @@ const INITIAL = {
   dep_time_min: '', dep_time_max: '',
   check_in: '', check_out: '',
   min_stars: '', max_hotel_budget: '',
+  min_rating: '',
   amenities: [],
   near_meeting_venue: false,
   meeting_venue: '',
@@ -185,6 +186,7 @@ export default function TravelForm({ onSubmit }) {
     if (f.dep_time_max)         payload.departure_time_max = f.dep_time_max
     if (f.min_stars)            payload.min_stars = Number(f.min_stars)
     if (f.max_hotel_budget)     payload.max_hotel_budget = Number(f.max_hotel_budget)
+    if (f.min_rating)           payload.min_rating = Number(f.min_rating)
     if (f.amenities.length)     payload.amenities = f.amenities
     if (f.meeting_venue.trim()) payload.meeting_venue = f.meeting_venue.trim()
 
@@ -317,6 +319,30 @@ export default function TravelForm({ onSubmit }) {
                 <label key={key} className={`amenity-chip${f.amenities.includes(key) ? ' selected' : ''}`}>
                   <input type="checkbox" checked={f.amenities.includes(key)}
                     onChange={() => toggleAmenity(key)} style={{ display: 'none' }} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Minimum puan */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', marginBottom: 8, fontSize: 13, color: 'var(--color-slate)' }}>
+              Ortalama Puanı (Opsiyonel)
+            </label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[
+                { value: '9', label: 'Fevkalade 9+' },
+                { value: '8', label: 'Çok iyi 8+' },
+                { value: '7', label: 'İyi 7+' },
+                { value: '6', label: 'Keyifli 6+' },
+              ].map(({ value, label }) => (
+                <label key={value} className={`amenity-chip${f.min_rating === value ? ' selected' : ''}`}
+                  style={{ fontSize: 12 }}>
+                  <input type="radio" name="min_rating" value={value}
+                    checked={f.min_rating === value}
+                    onChange={() => set('min_rating', f.min_rating === value ? '' : value)}
+                    style={{ display: 'none' }} />
                   {label}
                 </label>
               ))}
