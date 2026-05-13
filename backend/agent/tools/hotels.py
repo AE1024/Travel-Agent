@@ -239,6 +239,9 @@ def search_hotels(
         overall_rating = h.get("overall_rating")
         try:
             overall_rating = float(overall_rating) if overall_rating else None
+            # SerpAPI Google ölçeği 0-5, normalize edip 0-10'a çevir
+            if overall_rating is not None and overall_rating <= 5.0:
+                overall_rating = round(overall_rating * 2, 1)
         except (ValueError, TypeError):
             overall_rating = None
 
@@ -259,7 +262,7 @@ def search_hotels(
         ))
 
     if min_rating:
-        all_hotels = [h for h in all_hotels if h.rating is not None and h.rating >= min_rating]
+        all_hotels = [h for h in all_hotels if h.rating is None or h.rating >= min_rating]
 
     if amenities and "free_breakfast" in amenities:
         def _has_free_breakfast(h: HotelOption) -> bool:
