@@ -245,6 +245,10 @@ def search_flights(
                     booking_url=flight_data.get("booking_request", {}).get("url")
                 ))
 
+    if preferred_airline:
+        iata = preferred_airline.upper()
+        all_flights = [f for f in all_flights if f.flight_no.upper().startswith(iata)]
+
     if departure_time_min or departure_time_max:
         filtered = []
         for flight in all_flights:
