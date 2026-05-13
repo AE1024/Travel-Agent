@@ -18,6 +18,11 @@ export default function HotelCards({ hotels, nights, onSelect }) {
             <div className="rc-body">
               <div className="hc-info">
                 <p className="hc-name">{h.name}</p>
+                {h.rating != null && (
+                  <p className="rc-sub" style={{ color: 'var(--color-slate)', fontSize: 12 }}>
+                    Puan: <strong>{h.rating}</strong> / 10
+                  </p>
+                )}
                 {h.venue_distance_km != null && (
                   <p className="rc-sub">📍 Toplantı yerine {h.venue_distance_km} km</p>
                 )}

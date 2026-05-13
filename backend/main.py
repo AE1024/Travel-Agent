@@ -1,7 +1,6 @@
 import asyncio
 import math
 import os
-import uuid
 import requests as _requests
 from datetime import datetime
 from typing import Optional, List
@@ -10,13 +9,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from langchain_core.messages import HumanMessage, AIMessage
-from langgraph.types import Command
-
-from agent.graph import app as travel_graph
 import agent.tools.flights as flights_tool
 import agent.tools.hotels as hotels_tool
-import agent.tools.transport as transport_tool
 
 
 IATA_TO_CITY: dict[str, str] = {
@@ -298,18 +292,6 @@ def health():
     return {"status": "ok"}
 
 
-class ChatRequest(BaseModel):
-    message: str
-    thread_id: Optional[str] = None
-
-
-def _last_ai_message(state_values: dict) -> str:
-    for msg in reversed(state_values.get("messages", [])):
-        if isinstance(msg, AIMessage) and msg.content:
-            return msg.content
-    return ""
-
-
 _AIRLINE_TO_IATA: dict[str, str] = {
     "turkish airlines": "TK", "thy": "TK", "türk hava yolları": "TK",
     "pegasus": "PC", "flypgs": "PC",
@@ -356,159 +338,6 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return round(2 * R * math.asin(math.sqrt(a)), 2)
 
 
-def _get_results(phase: str, awaiting: bool) -> list:
-    if phase == "flight" and awaiting:
-        return [f.model_dump() for f in flights_tool.last_results]
-    if phase == "hotel" and awaiting:
-        return [h.model_dump() for h in hotels_tool.last_results]
-    if phase == "transport" and awaiting:
-        return [t.model_dump() for t in transport_tool.last_results]
-    return []
-
-
-@app.post("/chat")
-async def chat(req: ChatRequest):
-    thread_id = req.thread_id or str(uuid.uuid4())
-    config = {"configurable": {"thread_id": thread_id}}
-
-    try:
-        state = travel_graph.get_state(config)
-        is_new = not state.values or not state.values.get("messages")
-
-        has_interrupt = bool(
-            state.tasks and any(getattr(t, "interrupts", None) for t in state.tasks)
-        )
-
-        if is_new:
-            travel_graph.invoke(
-                {"messages": [HumanMessage(content=req.message)], "phase": "flight"},
-                config=config,
-            )
-        elif has_interrupt:
-            travel_graph.invoke(Command(resume=req.message), config=config)
-        else:
-            travel_graph.invoke(
-                {"messages": [HumanMessage(content=req.message)]},
-                config=config,
-            )
-
-        final_state = travel_graph.get_state(config)
-
-        interrupt_value = None
-        for task in (final_state.tasks or []):
-            for intr in getattr(task, "interrupts", []) or []:
-                interrupt_value = getattr(intr, "value", None)
-                break
-            if interrupt_value:
-                break
-
-        phase = final_state.values.get("phase", "flight")
-        awaiting = interrupt_value is not None
-        results = _get_results(phase, awaiting)
-
-        return {
-            "thread_id": thread_id,
-            "reply": _last_ai_message(final_state.values),
-            "phase": phase,
-            "results": results,
-            "awaiting_selection": awaiting,
-            "done": phase == "done",
-        }
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Agent hatası: {e}")
-
-
-class RecommendRequest(BaseModel):
-    flight: Optional[dict] = None
-    hotel:  Optional[dict] = None
-    flights: Optional[list[dict]] = None
-    hotels:  Optional[list[dict]] = None
-    context: str = "summary" 
-
-
-@app.post("/recommend")
-async def recommend(req: RecommendRequest):
-    """Uçuş/otel listesi veya seçimler için Cerebras ile kısa AI tavsiyesi üretir."""
-    cerebras_key = os.getenv("CEREBRAS_API_KEY")
-    if not cerebras_key:
-        raise HTTPException(status_code=500, detail="CEREBRAS_API_KEY bulunamadı.")
-
-    from langchain_openai import ChatOpenAI
-    from langchain_core.messages import SystemMessage, HumanMessage
-
-    llm = ChatOpenAI(
-        base_url="https://api.cerebras.ai/v1",
-        api_key=cerebras_key,
-        model="qwen-3-235b-a22b-instruct-2507",
-        temperature=0.4,
-        max_tokens=400,
-    )
-
-    system = "Sen kısa, net ve samimi yazan bir seyahat danışmanısın. Daima Türkçe yaz." \
-    " Amacın listelenmiş uçuş ve otel bilgilerine bakarak kullancılar için hangi ikili secenegın daha iyi olduguna dair öneride bulunmak."
-
-    if req.context == "flights" and req.flights:
-        lines = []
-        for i, f in enumerate(req.flights[:6], 1):
-            stops = "Direkt" if f.get("stops", 0) == 0 else f"{f.get('stops')} aktarma"
-            lines.append(
-                f"{i}. {f.get('airline','')} {f.get('flight_no','')} | "
-                f"{f.get('departure_time','')[:16]} → {f.get('arrival_time','')[:16]} | "
-                f"{f.get('duration','?')} dk | {stops} | ₺{f.get('price',0):,.0f}"
-            )
-        prompt = (
-            "Aşağıdaki uçuş seçeneklerini incele. Fiyat, süre ve aktarma sayısına göre "
-            "en iyi 1-2 seçeneği kısaca öner. Maksimum 3 cümle yaz.\n\n"
-            + "\n".join(lines)
-        )
-
-    elif req.context == "hotels" and req.hotels:
-        lines = []
-        for i, h in enumerate(req.hotels[:6], 1):
-            stars = "★" * (h.get("stars") or 0)
-            dist = f" | Havalimanına {h.get('airport_distance_km','?')} km" if h.get("airport_distance_km") else ""
-            lines.append(
-                f"{i}. {h.get('name','')} {stars} | "
-                f"₺{h.get('price_per_night',0):,.0f}/gece{dist}"
-            )
-        prompt = (
-            "Aşağıdaki otel seçeneklerini incele. Fiyat, yıldız ve konuma göre "
-            "en iyi 1-2 seçeneği kısaca öner. Maksimum 3 cümle yaz.\n\n"
-            + "\n".join(lines)
-        )
-
-    else:
-        # Özet: seçilmiş uçuş + otel değerlendirmesi
-        f = req.flight or {}
-        h = req.hotel or {}
-        flight_str = (
-            f"{f.get('airline','')} {f.get('flight_no','')} | "
-            f"{'Direkt' if f.get('stops',0)==0 else str(f.get('stops','?'))+' aktarma'} | "
-            f"₺{f.get('price',0):,.0f}"
-        ) if f else "Uçuş bilgisi yok"
-        hotel_str = (
-            f"{h.get('name','')} | {'★'*(h.get('stars') or 0)} | "
-            f"₺{h.get('price_per_night',0):,.0f}/gece"
-        ) if h else "Otel bilgisi yok"
-        prompt = (
-            f"Seçilen uçuş ve otel için 2-3 cümlelik samimi değerlendirme yap. "
-            f"Avantajlarını vurgula, varsa dikkat noktasını belirt.\n\n"
-            f"Uçuş: {flight_str}\nOtel: {hotel_str}"
-        )
-
-    try:
-        response = await asyncio.to_thread(
-            llm.invoke,
-            [SystemMessage(content=system), HumanMessage(content=prompt)]
-        )
-        return {"recommendation": response.content}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI öneri hatası: {e}")
-
-
 class PackageSearchRequest(BaseModel):
     # Uçuş (zorunlu)
     origin: str
@@ -532,144 +361,6 @@ class PackageSearchRequest(BaseModel):
     near_meeting_venue: bool = False
     # Toplantı/Etkinlik (opsiyonel)
     meeting_venue: Optional[str] = None
-
-
-@app.get("/resolve")
-async def resolve_endpoint(q: str):
-    """Şehir adı veya IATA kodunu çöz → {iata, city} döner."""
-    iata, city = resolve_location(q)
-    return {"iata": iata, "city": city, "known": iata in IATA_TO_CITY}
-
-
-@app.post("/packages")
-async def search_packages(req: PackageSearchRequest):
-    origin_iata, origin_city       = resolve_location(req.origin)
-    destination_iata, destination_city = resolve_location(req.destination)
-
-    origin      = origin_iata
-    destination = destination_iata
-
-    # Uçuş araması
-    flight_params = {
-        "origin": origin,
-        "destination": destination,
-        "outbound_date": req.departure_date,
-        "adults": req.passengers,
-        "travel_class": req.travel_class,
-    }
-    if req.max_flight_budget:
-        flight_params["max_budget"] = req.max_flight_budget
-    if req.preferred_airline:
-        flight_params["preferred_airline"] = resolve_airline(req.preferred_airline)
-    if req.departure_time_min:
-        flight_params["departure_time_min"] = req.departure_time_min
-    if req.departure_time_max:
-        flight_params["departure_time_max"] = req.departure_time_max
-
-    await asyncio.to_thread(flights_tool.search_flights.invoke, flight_params)
-    flight_results = list(flights_tool.last_results)
-
-    if not flight_results:
-        raise HTTPException(status_code=404, detail=f"{origin}→{destination} için {req.departure_date} tarihinde uçuş bulunamadı.")
-
-    # ── Toplantı yeri koordinatlarını önceden al (async olmayan çağrı, thread'de yap) ──
-    venue_coords: tuple[float, float] | None = None
-    if req.meeting_venue and req.near_meeting_venue:
-        venue_query = f"{req.meeting_venue}, {destination_city}"
-        venue_coords = await asyncio.to_thread(_nominatim_coords, venue_query)
-
-    # ── Otel araması ──
-    # Her zaman sadece şehir adını kullan; venue yakınlığı haversine ile sonradan hesaplanır
-    hotel_query_city = destination_city
-
-    hotel_params = {
-        "destination_city": hotel_query_city,
-        "check_in_date": req.check_in,
-        "check_out_date": req.check_out,
-        "airport_iata": destination,
-        "adults": req.passengers,
-        "sort_by": "rating",  # dereceye göre sırala, turist dairelerini eler
-    }
-    if req.max_hotel_budget:
-        hotel_params["max_budget"] = req.max_hotel_budget
-    if req.min_stars:
-        hotel_params["min_stars"] = req.min_stars
-    if req.min_rating:
-        hotel_params["min_rating"] = req.min_rating
-    if req.amenities:
-        hotel_params["amenities"] = req.amenities
-
-    await asyncio.to_thread(hotels_tool.search_hotels.invoke, hotel_params)
-    hotel_results = list(hotels_tool.last_results)
-
-    if not hotel_results:
-        raise HTTPException(status_code=404, detail=f"{destination_city} için {req.check_in}–{req.check_out} arasında otel bulunamadı.")
-
-    # ── Otel verilerini zenginleştir (sadece Booking.com linki, venue mesafesi) ──
-    def enrich_hotel(h) -> dict:
-        d = h.model_dump()
-        booking_url = d.get("platform_links", {}).get("Booking.com") or d.get("booking_url")
-        d["platform_links"] = {"Booking.com": booking_url} if booking_url else {}
-        if venue_coords and d.get("latitude") and d.get("longitude"):
-            d["venue_distance_km"] = _haversine_km(
-                d["latitude"], d["longitude"], venue_coords[0], venue_coords[1]
-            )
-        else:
-            d["venue_distance_km"] = None
-        return d
-
-    hotels_enriched = [enrich_hotel(h) for h in hotel_results]
-
-    # Venue varsa mesafeye göre sırala
-    if venue_coords:
-        hotels_enriched.sort(key=lambda h: h["venue_distance_km"] if h["venue_distance_km"] is not None else 9999)
-
-    # Gecelik fiyat × gece sayısı
-    try:
-        nights = (datetime.strptime(req.check_out, "%Y-%m-%d") - datetime.strptime(req.check_in, "%Y-%m-%d")).days
-    except ValueError:
-        nights = 1
-
-    # ── Uçuş × Otel kombinasyonları ──
-    # 6 uçuş × 6 otel = 36 kombinasyon → sırala → en fazla 2 tekrar ile en iyi 8 paketi al
-    all_packages = []
-    for flight in flight_results[:6]:
-        for hotel in hotels_enriched[:6]:
-            hotel_total = (hotel.get("price_per_night") or 0) * nights
-            total = flight.price + hotel_total
-            all_packages.append({
-                "flight": flight.model_dump(),
-                "hotel": hotel,
-                "nights": nights,
-                "hotel_total": round(hotel_total, 2),
-                "total_price": round(total, 2),
-            })
-
-    if venue_coords:
-        def venue_score(p):
-            dist = p["hotel"].get("venue_distance_km") or 5.0
-            return p["total_price"] + dist * 200
-        all_packages.sort(key=venue_score)
-    else:
-        all_packages.sort(key=lambda p: p["total_price"])
-
-    # Aynı otel veya uçuş en fazla 2 kez çıksın
-    from collections import defaultdict
-    flight_counts: dict = defaultdict(int)
-    hotel_counts:  dict = defaultdict(int)
-    packages = []
-    for pkg in all_packages:
-        fkey = pkg["flight"].get("flight_no") or pkg["flight"].get("airline", "")
-        hkey = pkg["hotel"].get("name", "")
-        if flight_counts[fkey] >= 2 or hotel_counts[hkey] >= 2:
-            continue
-        packages.append(pkg)
-        flight_counts[fkey] += 1
-        hotel_counts[hkey]  += 1
-        if len(packages) >= 8:
-            break
-
-    return {"packages": packages, "destination_city": destination_city}
 
 
 @app.post("/search-flights")
@@ -740,6 +431,8 @@ async def endpoint_search_hotels(req: PackageSearchRequest):
         hotel_params["max_budget"] = req.max_hotel_budget
     if req.min_stars:
         hotel_params["min_stars"] = req.min_stars
+    if req.min_rating:
+        hotel_params["min_rating"] = req.min_rating
     if req.amenities:
         hotel_params["amenities"] = req.amenities
 
@@ -781,8 +474,3 @@ async def endpoint_search_hotels(req: PackageSearchRequest):
         "destination_city": destination_city,
         "nights":           nights,
     }
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}

@@ -1,4 +1,4 @@
-from typing import TypedDict , List, Union
+from typing import Union, List
 from pydantic import BaseModel, Field
  
 
@@ -40,35 +40,3 @@ class TransportOption(BaseModel):
     steps: list[str] = []
     maps_url: str | None = None
 
-class TravelPackage(BaseModel):
-    flight: FlightOption       
-    hotel: HotelOption          
-    transport: TransportOption  
-    total_price: float
-
-# ── LangGraph state ──────────────────────────────────
-
-class TravelState(TypedDict):
-    # kullanıcıdan gelenler
-    origin_city: str
-    destination_city: str
-    travel_date: str
-    travel_date_end: str | None
-    person_count: int
-    flight_budget: float | None
-    hotel_budget: float | None
-    time_range: tuple[str, str] | None
-    preferred_airline: str | None
-    purpose: str                       
-    venue_name: str | None
-
-    # agent'ın doldurduğu alanlar
-    place_coords: tuple[float, float] | None
-    flight_options: list[FlightOption] | None  
-    hotels: list[HotelOption] | None 
-    transports: list[TransportOption] | None  
-    selected_flight: FlightOption | None
-    selected_hotel: HotelOption | None        
-    selected_transport: TransportOption | None
-    packages: list[TravelPackage] | None
-    current_step: str
