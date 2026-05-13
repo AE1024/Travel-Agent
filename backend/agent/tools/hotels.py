@@ -125,6 +125,7 @@ def search_hotels(
     amenities: list[str] | None = None,
     sort_by: str | None = None,
     min_rating: float | None = None,
+    max_rating: float | None = None,
 ) -> str:
     """Search for available hotels across Booking.com and Airbnb.
     airport_iata: Destination airport IATA code (e.g. 'LHR'). Used to calculate distance.
@@ -176,6 +177,7 @@ def search_hotels(
         params["sort_by"] = 3
     elif sort_by == "rating":
         params["sort_by"] = 8
+
 
     if amenities:
         codes = [AMENITY_CODES[a] for a in amenities if a in AMENITY_CODES]
@@ -261,9 +263,10 @@ def search_hotels(
             platform_links=platform_links,
         ))
 
-    if min_rating:
-        all_hotels = [h for h in all_hotels if h.rating is None or h.rating >= min_rating]
+    if min_rating and max_rating:
+        all_hotels = [h for h in all_hotels if h.rating is None or min_rating <= h.rating <= max_rating]
 
+    
     if amenities and "free_breakfast" in amenities:
         def _has_free_breakfast(h: HotelOption) -> bool:
             for a in h.amenities:

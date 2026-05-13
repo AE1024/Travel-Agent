@@ -357,6 +357,7 @@ class PackageSearchRequest(BaseModel):
     min_stars: Optional[int] = None
     max_hotel_budget: Optional[float] = None
     min_rating: Optional[float] = None
+    max_rating: Optional[float] = None
     amenities: Optional[List[str]] = None
     near_meeting_venue: bool = False
     # Toplantı/Etkinlik (opsiyonel)
@@ -431,8 +432,9 @@ async def endpoint_search_hotels(req: PackageSearchRequest):
         hotel_params["max_budget"] = req.max_hotel_budget
     if req.min_stars:
         hotel_params["min_stars"] = req.min_stars
-    if req.min_rating:
+    if req.min_rating and req.max_rating:
         hotel_params["min_rating"] = req.min_rating
+        hotel_params["max_rating"] = req.max_rating
     if req.amenities:
         hotel_params["amenities"] = req.amenities
 

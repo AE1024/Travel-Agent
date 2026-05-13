@@ -118,7 +118,7 @@ const INITIAL = {
   dep_time_min: '', dep_time_max: '',
   check_in: '', check_out: '',
   min_stars: '', max_hotel_budget: '',
-  min_rating: '',
+  rating_range: '',
   amenities: [],
   near_meeting_venue: false,
   meeting_venue: '',
@@ -186,7 +186,11 @@ export default function TravelForm({ onSubmit }) {
     if (f.dep_time_max)         payload.departure_time_max = f.dep_time_max
     if (f.min_stars)            payload.min_stars = Number(f.min_stars)
     if (f.max_hotel_budget)     payload.max_hotel_budget = Number(f.max_hotel_budget)
-    if (f.min_rating)           payload.min_rating = Number(f.min_rating)
+    if (f.rating_range) {
+      const [mn, mx] = f.rating_range.split('-').map(Number)
+      payload.min_rating = mn
+      payload.max_rating = mx
+    }
     if (f.amenities.length)     payload.amenities = f.amenities
     if (f.meeting_venue.trim()) payload.meeting_venue = f.meeting_venue.trim()
 
@@ -325,23 +329,23 @@ export default function TravelForm({ onSubmit }) {
             </div>
           </div>
 
-          {/* Minimum puan */}
+          {/* Puan aralığı */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', marginBottom: 8, fontSize: 13, color: 'var(--color-slate)' }}>
               Ortalama Puanı (Opsiyonel)
             </label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {[
-                { value: '9', label: 'Fevkalade 9+' },
-                { value: '8', label: 'Çok iyi 8+' },
-                { value: '7', label: 'İyi 7+' },
-                { value: '6', label: 'Keyifli 6+' },
+                { value: '4-6',  label: '4 – 6' },
+                { value: '6-8',  label: '6 – 8' },
+                { value: '8-9',  label: '8 – 9' },
+                { value: '9-10', label: '9 – 10' },
               ].map(({ value, label }) => (
-                <label key={value} className={`amenity-chip${f.min_rating === value ? ' selected' : ''}`}
+                <label key={value} className={`amenity-chip${f.rating_range === value ? ' selected' : ''}`}
                   style={{ fontSize: 12 }}>
-                  <input type="radio" name="min_rating" value={value}
-                    checked={f.min_rating === value}
-                    onChange={() => set('min_rating', f.min_rating === value ? '' : value)}
+                  <input type="radio" name="rating_range" value={value}
+                    checked={f.rating_range === value}
+                    onChange={() => set('rating_range', f.rating_range === value ? '' : value)}
                     style={{ display: 'none' }} />
                   {label}
                 </label>
