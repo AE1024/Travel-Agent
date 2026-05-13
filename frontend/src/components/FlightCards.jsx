@@ -24,7 +24,7 @@ const CLASS_LABELS = {
 }
 
 const IATA_CITY = {
-  IST:'İstanbul (Atatürk)', SAW:'İstanbul (Sabiha)', ESB:'Ankara', ADB:'İzmir',
+  IST:'İstanbul Havalimanı', SAW:'İstanbul (Sabiha Gökçen)', ESB:'Ankara (Esenboğa)', ADB:'İzmir (Adnan Menderes)',
   AYT:'Antalya', DLM:'Dalaman', BJV:'Bodrum', TZX:'Trabzon', GZT:'Gaziantep',
   LHR:'Londra Heathrow', LGW:'Londra Gatwick', STN:'Londra Stansted',
   CDG:'Paris CDG', ORY:'Paris Orly',
