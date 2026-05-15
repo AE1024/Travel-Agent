@@ -73,6 +73,51 @@ correctness_metric = GEval(
     model=judge,
 )
 
+tool_call_metric = GEval(
+    name="Doğru Araç Çağrısı",
+    criteria=(
+        "Agent doğru aracı doğru parametrelerle çağırdı mı? "
+        "Uçuş fazında search_flights, otel fazında search_hotels, "
+        "transfer fazında search_transport çağrılmış olmalı. "
+        "Yanlış araç çağrıldıysa veya zorunlu parametre eksikse başarısız say."
+    ),
+    evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT, SingleTurnParams.EXPECTED_OUTPUT],
+    threshold=0.7,
+    model=judge,
+)
+
+context_sequence = GEval(
+    name="Bağlam Sürekliliği",
+    criteria=(
+        "Agent önceki turlardan gelen bilgileri (uçuş tarihi, varış IATA kodu, "
+        "yolcu sayısı) sonraki araç çağrılarına doğru aktardı mı? "
+        "Otel aramasında check_in_date ve airport_iata uçuştan alınmış olmalı. "
+        "Tekrar sorduysa veya yanlış değer kullandıysa başarısız say."
+    ),
+    evaluation_params=[
+        SingleTurnParams.ACTUAL_OUTPUT,
+        SingleTurnParams.EXPECTED_OUTPUT,
+        SingleTurnParams.INPUT,
+    ],
+    threshold=0.7,
+    model=judge,
+)
+
+hallucination_metric = GEval(
+    name="Halüsinasyon Yok",
+    criteria=(
+        "Agent araç sonuçlarında olmayan bir otel adı, uçuş fiyatı veya "
+        "havayolu ismi uydurup kullanıcıya sundu mu? "
+        "Araç çıktısında bulunmayan somut bir bilgi verilmişse başarısız say. "
+        "Genel öneriler (fiyat aralığı gibi) kabul edilebilir."
+    ),
+    evaluation_params=[
+        SingleTurnParams.ACTUAL_OUTPUT,
+        SingleTurnParams.RETRIEVAL_CONTEXT,
+    ],
+    threshold=0.8,
+    model=judge,
+)
 
 # ── Test 1: IATA Kodu Doğruluğu ───────────────────────────────────────────────
 
@@ -195,3 +240,76 @@ def test_off_topic_rejection():
         ),
     )
     assert_test(test_case, [correctness_metric])
+
+# ── 4. Tool Calling Correctness ───────────────────────────────────────────────
+
+def test_tool_calling_correctness():
+    """
+    Agent doğru fazda doğru aracı doğru IATA parametreleriyle çağırıyor mu?
+    Uçuş seçimi beklenmeden otele geçilmemeli.
+    """
+    test_case = LLMTestCase(
+        input="İstanbul'dan Paris'e 20 Ağustos 2026 için uçuş ara",
+        actual_output=(
+            "IST → CDG uçuşlarını arıyorum.\n"
+            "1. Turkish Airlines TK1827 | 08:00 → 10:30 | 3s 30dk | 4.500 TRY\n"
+            "2. Pegasus PC5502 | 14:00 → 16:30 | 3s 30dk | 3.800 TRY\n"
+            "✈ Lütfen bir uçuş seçin (örn: '1') ya da 'yeniden ara' yazın:"
+        ),
+        expected_output=(
+            "search_flights aracı origin=IST, destination=CDG, outbound_date=2026-08-20 "
+            "parametreleriyle çağrılmalı. Uçuşlar listelendikten sonra kullanıcıdan seçim "
+            "beklenmeli — otel aramasına henüz geçilmemeli."
+        ),
+    )
+    assert_test(test_case, [tool_call_metric])
+
+
+# ── 5. Context Retention (Bağlam Sürekliliği) ────────────────────────────────
+
+def test_context_retention():
+    test_case = LLMTestCase(
+        input=(
+            "[Konuşma geçmişi]\n"
+            "Kullanıcı İstanbul→Paris, 20 Ağustos 2026 uçuşunu seçti. "
+            "Seçilen uçuş: TK1827, IST→CDG, kalkış 2026-08-20.\n\n"
+            "[Yeni mesaj]\n"
+            "Kullanıcı: '3 gece kalmak istiyorum, wifi olsun'"
+        ),
+        actual_output=(
+            "Paris için 20–23 Ağustos 2026 tarihleri arasında otel arıyorum "
+            "(CDG havalimanı yakını, wifi filtreli).\n"
+            "1. Hôtel du Louvre ⭐⭐⭐⭐ | 9.2/10 | 2.800 TRY/gece\n"
+            "2. Citadines Opéra ⭐⭐⭐ | 8.6/10 | 1.900 TRY/gece\n"
+            "🏨 Lütfen bir otel seçin (örn: '1') ya da 'yeniden ara' yazın:"
+        ),
+        expected_output=(
+            "Agent uçuş tarihini (20 Ağustos 2026) ve varış havalimanını (CDG) "
+            "konuşma geçmişinden alarak 3 gece için 20–23 Ağustos aralığında "
+            "Paris otelleri listemeli. Kullanıcıya tarih veya şehir tekrar sorulmamalı. "
+            "Wifi filtresi uygulanmış olmalı."
+        ),
+    )
+    assert_test(test_case, [context_sequence])
+
+# ── 6. Hallucination (Araç Sonucu Dışına Çıkma) ──────────────────────────────
+
+def test_hallucination():
+    tool_results = [
+        "1. Hôtel du Louvre | ⭐⭐⭐⭐ | 9.2/10 | 2.800 TRY/gece",
+        "2. Citadines Apart'hotel Opéra | ⭐⭐⭐ | 8.6/10 | 1.900 TRY/gece",
+        "3. ibis Paris Opéra | ⭐⭐⭐ | 8.1/10 | 1.200 TRY/gece",
+    ]
+
+    test_case = LLMTestCase(
+        input="Paris için 20–23 Ağustos 2026 tarihlerinde otel öner, puan 8-9 olsun",
+        actual_output=(
+            "Paris için uygun oteller:\n"
+            "1. Hôtel du Louvre ⭐⭐⭐⭐ | 9.2/10 | 2.800 TRY/gece\n"
+            "2. Citadines Apart'hotel Opéra ⭐⭐⭐ | 8.6/10 | 1.900 TRY/gece\n"
+            "3. ibis Paris Opéra ⭐⭐⭐ | 8.1/10 | 1.200 TRY/gece\n"
+            "🏨 Lütfen bir otel seçin:"
+        ),
+        retrieval_context=tool_results,
+    )
+    assert_test(test_case, [hallucination_metric])
