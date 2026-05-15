@@ -263,8 +263,8 @@ def search_hotels(
             platform_links=platform_links,
         ))
 
-    if min_rating and max_rating:
-        all_hotels = [h for h in all_hotels if h.rating is None or min_rating <= h.rating <= max_rating]
+    if min_rating is not None:
+        all_hotels = [h for h in all_hotels if h.rating is None or h.rating >= min_rating]
 
     
     if amenities and "free_breakfast" in amenities:
@@ -281,7 +281,7 @@ def search_hotels(
 
     priced   = [h for h in all_hotels if h.price_per_night > 0]
     unpriced = [h for h in all_hotels if h.price_per_night == 0]
-    top = (priced + unpriced)[:10]
+    top = (priced + unpriced)[:20]
 
     print(f"[HOTELS] fiyatlı={len(priced)} fiyatsız={len(unpriced)} → top={len(top)}")
     last_results = top
