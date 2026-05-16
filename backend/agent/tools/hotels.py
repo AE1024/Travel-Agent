@@ -264,7 +264,9 @@ def search_hotels(
         ))
 
     if min_rating is not None:
-        all_hotels = [h for h in all_hotels if h.rating is None or h.rating >= min_rating]
+        all_hotels = [h for h in all_hotels if h.rating is not None and h.rating >= min_rating]
+    if max_rating is not None:
+        all_hotels = [h for h in all_hotels if h.rating is not None and h.rating <= max_rating]
 
     
     if amenities and "free_breakfast" in amenities:
